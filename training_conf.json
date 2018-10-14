@@ -1,0 +1,9 @@
+{
+    "training_dir": "data/train",
+    "validation_dir": "data/validation",
+    "checkpoints_dir": "trained_model",
+    "learning_rate": 0.01,
+    "model_type": "inceptionresnetv2",
+    "image_size": [299,299],
+    "epochs": 2
+}
