@@ -13,25 +13,37 @@ batchsize = 16
 trainsize = 1000
 validationsize = 160
 
+
+def setup_for_transfer_learning(base_model, model, lr):
+    sgd = optimizers.SGD(lr=lr, momentum=0.9, decay=0.0)
+    model.compile(optimizer = sgd, loss = 'binary_crossentropy', metrics=['accuracy'])
+
+def setup_for_finetuning(base_model, model, lr):
+    for layer in base_model.layers:
+        layer.trainable = True
+
+    sgd = optimizers.SGD(lr=lr, momentum=0.9, decay=0.0)
+    model.compile(optimizer = sgd, loss = 'binary_crossentropy', metrics=['accuracy'])
+
 def train(training_dir, validation_dir,lr,epochs,image_size,model_type,checkpoints_dir):
 
-    model = models_factory(model_type,image_size)
+    model, base_model = models_factory(model_type,image_size)
 
     ## Optimizers
+    '''
     adam = optimizers.Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
     rmsprop = "rmsprop"
     sgd = optimizers.SGD(lr=lr, momentum=0.9, decay=0.0)
-
     model.compile(optimizer = sgd, loss = 'binary_crossentropy', metrics=['accuracy'])
-
+    '''
 
     ## Callbacks
-    checkpoint_name = checkpoints_dir + "/weights_0.hdf5"
+    checkpoint_name = os.path.join(checkpoints_dir,"weights_0.hdf5")
+    history_path = os.path.join(checkpoints_dir, "history.csv")
     checkpointer = callback_factory('model_checkpoint')(checkpoint_name)
     early_stopping = callback_factory('early_stopping')(patience = 15)
     lr_scheduler = callback_factory('lr_kaggle')(lr)
-
-
+    history_writer = callback_factory('history_writer')(history_path)
 
     train_datagen = ImageDataGenerator(
             rescale=1./255,
@@ -54,37 +66,27 @@ def train(training_dir, validation_dir,lr,epochs,image_size,model_type,checkpoin
             batch_size=batchsize,
             class_mode='binary')
 
+    setup_for_transfer_learning(base_model, model, lr)
+
     history = model.fit_generator(
             train_generator,
             steps_per_epoch=trainsize // batchsize,
-            epochs=epochs,
+            epochs=min(5, epochs),
             validation_steps = validationsize // batchsize,
             validation_data=validation_generator,
-            callbacks = [checkpointer, early_stopping, lr_scheduler])
+            callbacks = [checkpointer, early_stopping, lr_scheduler, history_writer])
+    
+    setup_for_finetuning(base_model, model, lr)
 
+    history = model.fit_generator(
+            train_generator,
+            steps_per_epoch=trainsize // batchsize,
+            epochs=max(0,epochs-5),
+            validation_steps = validationsize // batchsize,
+            validation_data=validation_generator,
+            callbacks = [checkpointer, early_stopping, lr_scheduler, history_writer])
 
     print ("Training complete")
-
-    val_loss = []
-    val_accc = []
-    train_loss = []
-    train_acc = []
-
-    val_loss = history.history['val_loss']
-    val_acc = history.history['val_acc']
-    train_loss = history.history['loss']
-    train_acc = history.history['acc']
-
-    histories_df = pd.DataFrame({
-        'train_loss': train_loss,
-        'train_accuracy' : train_acc,
-        'val_loss': val_loss,
-        'val_accuracy': val_acc
-    })
-    history_path = os.path.join(checkpoints_dir, 'history.csv')
-    histories_df.to_csv(history_path)
-
-    print ("History Saved")
 
 
 def main():

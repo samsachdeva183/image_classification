@@ -31,4 +31,4 @@ def models_factory(model_type, image_size):
     top_model.add(Dense(1, activation = 'sigmoid'))
     model = Model(input = base_model.input, output = top_model(base_model.output))
 
-    return model
+    return model, base_model

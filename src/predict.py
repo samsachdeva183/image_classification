@@ -9,7 +9,7 @@ def predict(model, img):
     x = np.expand_dims(x, axis=0)
     #x = preprocess_input(x)
     preds = model.predict(x)
-    return preds[0]
+    return preds[0][0]
 
 
 model = load_model(model_path)

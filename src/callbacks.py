@@ -20,6 +20,28 @@ class LRKaggle(Callback):
             new_lr = 0.0001
 
         K.set_value(self.model.optimizer.lr, new_lr)
+
+class HistoryWriter(Callback):
+    def __init__(self, filepath):
+        super(HistoryWriter, self).__init__()
+        self.filepath = filepath
+    
+    def on_train_begin(self, logs = {}):
+        self.epoch_counter = 0
+        with open(self.filepath, "a+") as f:
+            f.write(",".join(["epoch", "tr_loss", 'tr_acc', 'val_loss', 'val_acc']))
+            f.write('\n')
+    
+    def on_epoch_end(self, epoch, logs = {}):
+        self.epoch_counter += 1
+
+        val_loss = logs.get('val_loss')
+        val_acc = logs.get('val_acc')
+        tr_loss = logs.get('loss')
+        tr_acc = logs.get('acc')
+        
+        with open(self.filepath, "a") as f:
+            f.write("{},{},{},{},{}\n".format(self.epoch_counter, tr_loss, tr_acc, val_loss, val_acc))
         
 def checkpoint_factory():
     def factory_f(checkpoint_name):
@@ -36,6 +58,13 @@ def lrkaggle_factory():
         return LRKaggle(starting_lr)
     return factory_f
 
+def historywriter_factory():
+    def factory_f(history_path):
+        return HistoryWriter(history_path)
+    return factory_f
+
+
+
 def callback_factory(callback_type):
     if callback_type == 'model_checkpoint':
         return checkpoint_factory()
@@ -43,5 +72,7 @@ def callback_factory(callback_type):
         return earlystopping_factory()
     elif callback_type == 'lr_kaggle':
         return lrkaggle_factory()
+    elif callback_type == 'history_writer':
+        return historywriter_factory()
     else:
         raise ValueError("Unknown callback type: " + callback_type)
